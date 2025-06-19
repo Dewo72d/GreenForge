@@ -34,6 +34,5 @@ void setup()
 void loop()
 {
   server.handleClient();
-
-
+  init_toggles_handler();
 }

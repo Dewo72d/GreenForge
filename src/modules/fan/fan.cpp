@@ -7,7 +7,7 @@ static uint8_t _fan_toggle_pin;
 static uint8_t _fan_pwm_channel = 0;
 static uint8_t _fan_pwm_value = 0;
 static bool _fan_state = false;
-static bool _fan_toggle_state = false; // Used for toggling fan state
+static bool _fan_toggle_last_state = HIGH;
 
 void fan_setup(uint8_t pin, uint8_t toggle_pin)
 {
@@ -20,7 +20,6 @@ void fan_setup(uint8_t pin, uint8_t toggle_pin)
     pinMode(_fan_toggle_pin, INPUT_PULLUP);
     digitalWrite(_fan_toggle_pin, LOW);
 
-    _fan_toggle_state = false;
     _fan_state = false;
     _fan_pwm_value = 0;
 }
@@ -51,17 +50,16 @@ uint8_t fan_pwm_value()
 
 void fan_toggle()
 {
-    if (digitalRead(_fan_toggle_pin) == LOW)
+    bool current = digitalRead(_fan_toggle_pin);
+    if (current == LOW)
     {
-        _fan_toggle_state = !_fan_toggle_state;
-        if (_fan_toggle_state)
-        {
-            fan_pwm(255);
-        }
-        else
-        {
-            fan_off();
-        }
+        _fan_state = true;
+        ledcWrite(_fan_pwm_channel, _fan_pwm_value);
+    }
+    else
+    {
+        _fan_state = false;
+        ledcWrite(_fan_pwm_channel, 0);
     }
 }
 
