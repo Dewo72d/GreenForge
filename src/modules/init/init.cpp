@@ -6,38 +6,22 @@
 #include "modules/wpump/wpump.h"
 // Pins
 #define LIGHT_PIN 23
-#define LIGHT_TOGGLE_PIN 22
 #define FAN_PIN 19
-#define FAN_TOGGLE_PIN 18
 #define WPUMP_PIN 5
 
 void init_modules(Esp32express &server)
 {
     // Initialize light module
-    light_setup(LIGHT_PIN, LIGHT_TOGGLE_PIN);
+    light_setup(LIGHT_PIN);
     light_register(server);
 
     // Initialize fan module
-    fan_setup(FAN_PIN, FAN_TOGGLE_PIN);
+    fan_setup(FAN_PIN);
     fan_register(server);
 
     // Initialize water pump module
     wpump_setup(WPUMP_PIN);
     wpump_register(server);
-}
-
-// This function is called periodically to check the toggle state of the fan
-void init_toggles_handler()
-{
-    static uint32_t lastToggleMillis = 0;
-    static const uint32_t toggleInterval = 50; // 0.5 second
-    uint32_t now = millis();
-    if (now - lastToggleMillis >= toggleInterval)
-    {
-        lastToggleMillis = now;
-        fan_toggle();
-        light_toggle();
-    }
 }
 
 String get_json_data(Esp32express &server, String field, String payload)

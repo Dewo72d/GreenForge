@@ -1,24 +1,19 @@
 #include "fan.h"
 #include <Arduino.h>
 #include "modules/init/init.h"
+#include <ArduinoJson.h>
 
 static uint8_t _fan_pin;
-static uint8_t _fan_toggle_pin;
 static uint8_t _fan_pwm_channel = 0;
 static uint8_t _fan_pwm_value = 0;
 static bool _fan_state = false;
-static bool _fan_toggle_last_state = HIGH;
 
-void fan_setup(uint8_t pin, uint8_t toggle_pin)
+void fan_setup(uint8_t pin)
 {
     _fan_pin = pin;
     ledcSetup(_fan_pwm_channel, 25000, 8);
     ledcAttachPin(_fan_pin, _fan_pwm_channel);
     ledcWrite(_fan_pwm_channel, 0);
-
-    _fan_toggle_pin = toggle_pin;
-    pinMode(_fan_toggle_pin, INPUT_PULLUP);
-    digitalWrite(_fan_toggle_pin, LOW);
 
     _fan_state = false;
     _fan_pwm_value = 0;
@@ -48,23 +43,51 @@ uint8_t fan_pwm_value()
     return _fan_pwm_value;
 }
 
-void fan_toggle()
-{
-    bool current = digitalRead(_fan_toggle_pin);
-    if (current == LOW)
-    {
-        _fan_state = true;
-        ledcWrite(_fan_pwm_channel, _fan_pwm_value);
-    }
-    else
-    {
-        _fan_state = false;
-        ledcWrite(_fan_pwm_channel, 0);
-    }
-}
-
 void fan_register(Esp32express &server)
 {
+
+    String response = server.httpGET("http://192.168.0.103:3001/api/fan/state");
+    Serial.println("Fan state response: " + response);
+
+    if (response.length() > 0)
+    {
+        StaticJsonDocument<256> doc;
+        DeserializationError err = deserializeJson(doc, response);
+        if (!err)
+        {
+            int rawValue = doc["value"] | 0;
+            bool state = doc["state"] | false;
+
+            // Определим, это процент (0–100) или уже 0–255
+            uint8_t pwmValue;
+            if (rawValue <= 100)
+            {
+                pwmValue = map(rawValue, 0, 100, 0, 255);
+            }
+            else
+            {
+                if (rawValue > 255)
+                    rawValue = 255;
+                pwmValue = rawValue;
+            }
+
+            if (!state)
+            {
+                pwmValue = 0;
+            }
+
+            fan_pwm(pwmValue);
+
+            Serial.printf("Init fan: serverState=%s rawValue=%d appliedPWM=%u\n",
+                          state ? "ON" : "OFF", rawValue, pwmValue);
+        }
+        else
+        {
+            Serial.print("JSON parse error: ");
+            Serial.println(err.f_str());
+        }
+    }
+
     server.on("/fan/pwm", [&server](WebServer &webServer)
               {
                   uint8_t value = 0;

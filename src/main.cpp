@@ -3,11 +3,11 @@
 #include "modules/init/init.h"
 
 // Wi-Fi
-const char *ssid = "wifi";
-const char *password = "wifi123";
+const char *ssid = "security";
+const char *password = "passwordSuck!1";
 // Server
-const uint16_t port = 3000;
-const uint8_t octet = 150;
+const uint16_t port = 8080;
+const uint8_t octet = 110;
 Esp32express server(ssid, password, port, octet);
 
 void setup()
@@ -34,5 +34,4 @@ void setup()
 void loop()
 {
   server.handleClient();
-  init_toggles_handler();
 }
