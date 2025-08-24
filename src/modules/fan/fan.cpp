@@ -8,6 +8,22 @@ static uint8_t _fan_pwm_channel = 0;
 static uint8_t _fan_pwm_value = 0;
 static bool _fan_state = false;
 
+String get_json_data(Esp32express &server, String field, JsonVariant payload)
+{
+    StaticJsonDocument<256> data;
+    uint32_t heap = esp_get_free_heap_size();
+    String ip = server.deviceIP();
+
+    data["ip"] = ip;
+    data["heap"] = heap;
+    data[field] = payload;
+
+    String json;
+    serializeJson(data, json);
+
+    return json;
+}
+
 void fan_setup(uint8_t pin)
 {
     _fan_pin = pin;
@@ -45,9 +61,8 @@ uint8_t fan_pwm_value()
 
 void fan_register(Esp32express &server)
 {
-
-    String response = server.httpGET("http://192.168.0.103:3001/api/fan/state");
-    Serial.println("Fan state response: " + response);
+    String response = server.httpGET("http://192.168.0.103:3001/api/fan/init");
+    Serial.println("Fan init response: " + response);
 
     if (response.length() > 0)
     {
@@ -58,24 +73,9 @@ void fan_register(Esp32express &server)
             int rawValue = doc["value"] | 0;
             bool state = doc["state"] | false;
 
-            // Определим, это процент (0–100) или уже 0–255
-            uint8_t pwmValue;
-            if (rawValue <= 100)
-            {
-                pwmValue = map(rawValue, 0, 100, 0, 255);
-            }
-            else
-            {
-                if (rawValue > 255)
-                    rawValue = 255;
-                pwmValue = rawValue;
-            }
-
+            uint8_t pwmValue = rawValue > 255 ? 255 : rawValue;
             if (!state)
-            {
                 pwmValue = 0;
-            }
-
             fan_pwm(pwmValue);
 
             Serial.printf("Init fan: serverState=%s rawValue=%d appliedPWM=%u\n",
@@ -90,27 +90,36 @@ void fan_register(Esp32express &server)
 
     server.on("/fan/pwm", [&server](WebServer &webServer)
               {
-                  uint8_t value = 0;
-                  if (webServer.hasArg("value")) {
-                      value = webServer.arg("value").toInt();
-                  } else if (webServer.method() == HTTP_POST && webServer.hasArg("plain")) {
-                      String body = webServer.arg("plain");
-                      value = body.toInt();
-                  }
-                  if (value > 255) value = 255;
-                  fan_pwm(value);
-                  String payload = get_json_data(server, "fan_pwm", String(value));
-                  webServer.send(200, "application/json", payload); });
+        uint8_t value = 0;
+        if (webServer.hasArg("value")) {
+            value = webServer.arg("value").toInt();
+        } else if (webServer.method() == HTTP_POST && webServer.hasArg("plain")) {
+            String body = webServer.arg("plain");
+            value = body.toInt();
+        }
+        if (value > 255) value = 255;
+        fan_pwm(value);
+
+        StaticJsonDocument<128> doc;
+        doc["state"] = fan_pwm_state();
+        doc["value"] = fan_pwm_value();
+        String payload = get_json_data(server, "fan", doc.as<JsonVariant>());
+        webServer.send(200, "application/json", payload); });
 
     server.on("/fan/off", [&server](WebServer &webServer)
               {
-                  fan_off();
-                  String payload = get_json_data(server, "fan", "OFF");
-                  webServer.send(200, "application/json", payload); });
+        fan_off();
+        StaticJsonDocument<128> doc;
+        doc["state"] = false;
+        doc["value"] = 0;
+        String payload = get_json_data(server, "fan", doc.as<JsonVariant>());
+        webServer.send(200, "application/json", payload); });
 
     server.on("/fan/state", [&server](WebServer &webServer)
               {
-                  String state = fan_pwm_state() ? "ON" : "OFF";
-                  String json_payload = get_json_data(server, "fan_state", state + ", value: " + String(fan_pwm_value()));
-                  webServer.send(200, "application/json", json_payload); });
+        StaticJsonDocument<128> doc;
+        doc["state"] = fan_pwm_state();
+        doc["value"] = fan_pwm_value();
+        String payload = get_json_data(server, "fan", doc.as<JsonVariant>());
+        webServer.send(200, "application/json", payload); });
 }
