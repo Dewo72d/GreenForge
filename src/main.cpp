@@ -19,7 +19,6 @@ void setup()
   Serial.print("MAC address: ");
   Serial.println(mac);
   server.connectWiFi();
-
   init_modules(server);
 
   Serial.println("Program begun!");

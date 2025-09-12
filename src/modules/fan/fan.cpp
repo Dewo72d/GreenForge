@@ -8,22 +8,6 @@ static uint8_t _fan_pwm_channel = 0;
 static uint8_t _fan_pwm_value = 0;
 static bool _fan_state = false;
 
-String get_json_data(Esp32express &server, String field, JsonVariant payload)
-{
-    StaticJsonDocument<256> data;
-    uint32_t heap = esp_get_free_heap_size();
-    String ip = server.deviceIP();
-
-    data["ip"] = ip;
-    data["heap"] = heap;
-    data[field] = payload;
-
-    String json;
-    serializeJson(data, json);
-
-    return json;
-}
-
 void fan_setup(uint8_t pin)
 {
     _fan_pin = pin;
@@ -66,7 +50,7 @@ void fan_register(Esp32express &server)
 
     if (response.length() > 0)
     {
-        StaticJsonDocument<256> doc;
+        DynamicJsonDocument doc(256);
         DeserializationError err = deserializeJson(doc, response);
         if (!err)
         {
@@ -100,7 +84,7 @@ void fan_register(Esp32express &server)
         if (value > 255) value = 255;
         fan_pwm(value);
 
-        StaticJsonDocument<128> doc;
+        DynamicJsonDocument doc(128);
         doc["state"] = fan_pwm_state();
         doc["value"] = fan_pwm_value();
         String payload = get_json_data(server, "fan", doc.as<JsonVariant>());
@@ -109,7 +93,7 @@ void fan_register(Esp32express &server)
     server.on("/fan/off", [&server](WebServer &webServer)
               {
         fan_off();
-        StaticJsonDocument<128> doc;
+        DynamicJsonDocument doc(128);
         doc["state"] = false;
         doc["value"] = 0;
         String payload = get_json_data(server, "fan", doc.as<JsonVariant>());
@@ -117,7 +101,7 @@ void fan_register(Esp32express &server)
 
     server.on("/fan/state", [&server](WebServer &webServer)
               {
-        StaticJsonDocument<128> doc;
+        DynamicJsonDocument doc(128);
         doc["state"] = fan_pwm_state();
         doc["value"] = fan_pwm_value();
         String payload = get_json_data(server, "fan", doc.as<JsonVariant>());
